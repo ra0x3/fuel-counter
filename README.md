@@ -14,11 +14,13 @@ forc deploy --locked
 
 Set deployed contract ID
 ```bash
-echo "CONTRACT_ID="0x123...." > programs/counter-rs/.env
+cd programs/counter-rs
+echo "CONTRACT_ID='0x123....'" > programs/counter-rs/.env
 ```
 
 Run the backend
 ```bash
+cd programs/counter-rs
 RUST_LOG=debug cargo run --bin server
 ```
 
