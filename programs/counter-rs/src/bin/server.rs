@@ -1,10 +1,10 @@
-extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 
+extern crate pretty_env_logger;
+
 use actix_web::{middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer};
-use counter::{get_contract_id, tx_params, Counter};
-use fuels::prelude::*;
+use counter::{get_contract_id, setup_provider_and_wallet, tx_params, Counter};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
@@ -73,8 +73,7 @@ async fn get_count(req: HttpRequest) -> Result<HttpResponse, Error> {
 async fn main() -> std::io::Result<()> {
     pretty_env_logger::init();
 
-    let (provider, wallet) = setup_test_provider_and_wallet().await;
-
+    let (provider, wallet) = setup_provider_and_wallet().await;
     let contract_id: String = get_contract_id(&provider, &wallet).await;
     info!("Using contract at {}", contract_id);
     let contract: Counter = Counter::new(contract_id, provider, wallet);

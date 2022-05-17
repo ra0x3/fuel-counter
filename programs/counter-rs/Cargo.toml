@@ -19,7 +19,10 @@ json = "0.12"
 fuel-tx = "0.9"
 fuels-abigen-macro = "0.12"
 fuels = "0.12"
+fuel-gql-client = "0.6"
+fuel-core = "0.6"
 dotenv = "0.14"
+rand = "0.8"
 
 [[bin]]
 name = "server"

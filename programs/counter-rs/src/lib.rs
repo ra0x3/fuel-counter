@@ -1,9 +1,14 @@
 #[macro_use]
 extern crate log;
 
-use fuels::prelude::*;
-use fuels::signers::wallet::Wallet;
+use fuel_gql_client::client::FuelClient;
+use fuel_core::{service::{Config, FuelService}};
+use fuels::{
+    prelude::{Contract, LocalWallet, Provider, TxParameters},
+    signers::{fuel_crypto::SecretKey, wallet::Wallet},
+};
 use fuels_abigen_macro::abigen;
+use rand::{rngs::StdRng, RngCore, SeedableRng};
 
 pub async fn get_contract_id(provider: &Provider, wallet: &Wallet) -> String {
     dotenv::dotenv().ok();
@@ -24,6 +29,22 @@ pub async fn get_contract_id(provider: &Provider, wallet: &Wallet) -> String {
             contract_id.to_string()
         }
     }
+}
+
+pub async fn setup_provider_and_wallet() -> (Provider, LocalWallet) {
+    let srv = FuelService::new_node(Config::local_node()).await.unwrap();
+    let client = FuelClient::from(srv.bound_address);
+    info!("Fuel client started at {:?}", client);
+
+    let mut rng = StdRng::seed_from_u64(2322u64);
+    let mut secret_seed = [0u8; 32];
+    rng.fill_bytes(&mut secret_seed);
+    let secret = unsafe { SecretKey::from_bytes_unchecked(secret_seed) };
+
+    let provider = Provider::new(client);
+    let wallet = LocalWallet::new_from_private_key(secret, provider.clone());
+
+    (provider, wallet)
 }
 
 pub fn tx_params() -> TxParameters {
