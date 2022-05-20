@@ -3,24 +3,39 @@ extern crate log;
 
 extern crate pretty_env_logger;
 
-use actix_web::{middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{middleware, web, web::Bytes, App, Error, HttpRequest, HttpResponse, HttpServer};
 use counter::{get_contract_id, setup_provider_and_wallet, tx_params, Counter};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Increment {
-    success: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct GetCount {
+struct IncrementCountResponse {
     success: bool,
     count: u32,
 }
 
-async fn increment_count(req: HttpRequest) -> Result<HttpResponse, Error> {
-    let resp = Increment { success: true };
+#[derive(Debug, Serialize, Deserialize)]
+struct IncrementCountRequest {
+    count: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct GetCountResponse {
+    success: bool,
+    count: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct InitCountResponse {
+    success: bool,
+    count: u32,
+}
+
+async fn initialize_count(req: HttpRequest) -> Result<HttpResponse, Error> {
+    let resp = InitCountResponse {
+        success: true,
+        count: 1u32,
+    };
     let state = req.app_data::<web::Data<Mutex<Counter>>>().unwrap();
     let contract = match state.lock() {
         Ok(c) => c,
@@ -33,7 +48,7 @@ async fn increment_count(req: HttpRequest) -> Result<HttpResponse, Error> {
     };
 
     let result = contract
-        .increment_counter(1)
+        .init_counter(1)
         .tx_params(tx_params())
         .call()
         .await
@@ -41,17 +56,54 @@ async fn increment_count(req: HttpRequest) -> Result<HttpResponse, Error> {
 
     debug!("{:?}", result);
 
-    Ok(HttpResponse::Ok()
-        .content_type("application/json")
-        .body(serde_json::to_string(&resp).unwrap()))
+    let count: u32 = result.receipts[1].val().unwrap();
+    Ok(HttpResponse::Ok().content_type("application/json").body(
+        serde_json::to_string(&InitCountResponse {
+            success: true,
+            count,
+        })
+        .unwrap(),
+    ))
+}
+
+async fn increment_count(req: HttpRequest, body: Bytes) -> Result<HttpResponse, Error> {
+    let json_body: IncrementCountRequest = serde_json::from_slice(&body).unwrap();
+    let state = req.app_data::<web::Data<Mutex<Counter>>>().unwrap();
+
+    let contract = match state.lock() {
+        Ok(c) => c,
+        Err(e) => {
+            error!("Could not get state: {}", e);
+            return Ok(HttpResponse::Ok().content_type("application/json").body(
+                serde_json::to_string(&IncrementCountResponse {
+                    success: false,
+                    count: 0u32,
+                })
+                .unwrap(),
+            ));
+        }
+    };
+
+    let result = contract
+        .increment_counter(json_body.count)
+        .tx_params(tx_params())
+        .call()
+        .await
+        .unwrap();
+
+    debug!("{:?}", result);
+    let count: u32 = result.receipts[1].val().unwrap();
+
+    Ok(HttpResponse::Ok().content_type("application/json").body(
+        serde_json::to_string(&IncrementCountResponse {
+            success: true,
+            count,
+        })
+        .unwrap(),
+    ))
 }
 
 async fn get_count(req: HttpRequest) -> Result<HttpResponse, Error> {
-    let resp = GetCount {
-        success: true,
-        count: 1u32,
-    };
-
     let state = req.app_data::<web::Data<Mutex<Counter>>>().unwrap();
     let contract = state.lock().unwrap();
 
@@ -63,20 +115,25 @@ async fn get_count(req: HttpRequest) -> Result<HttpResponse, Error> {
         .unwrap();
 
     debug!("{:?}", result);
+    let count: u32 = result.receipts[1].val().unwrap();
 
-    Ok(HttpResponse::Ok()
-        .content_type("application/json")
-        .body(serde_json::to_string(&resp).unwrap()))
+    Ok(HttpResponse::Ok().content_type("application/json").body(
+        serde_json::to_string(&GetCountResponse {
+            success: true,
+            count,
+        })
+        .unwrap(),
+    ))
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     pretty_env_logger::init();
 
-    let (provider, wallet) = setup_provider_and_wallet().await;
-    let contract_id: String = get_contract_id(&provider, &wallet).await;
+    let (_provider, wallet) = setup_provider_and_wallet().await;
+    let contract_id: String = get_contract_id(&wallet).await;
     info!("Using contract at {}", contract_id);
-    let contract: Counter = Counter::new(contract_id, provider, wallet);
+    let contract: Counter = Counter::new(contract_id, wallet);
 
     let state = web::Data::new(Mutex::new(contract));
 
@@ -87,9 +144,10 @@ async fn main() -> std::io::Result<()> {
             .app_data(state.clone())
             .wrap(middleware::Logger::default())
             .service(
-                web::resource("/counter")
+                web::resource("/count")
                     .app_data(web::JsonConfig::default().limit(1024))
-                    .route(web::post().to(increment_count))
+                    .route(web::put().to(increment_count))
+                    .route(web::post().to(initialize_count))
                     .route(web::get().to(get_count)),
             )
     })
@@ -124,11 +182,11 @@ mod tests {
     #[actix_web::test]
     async fn test_get_count() {
         let app = test::init_service(
-            App::new().service(web::resource("/counter").route(web::get().to(get_count))),
+            App::new().service(web::resource("/count").route(web::get().to(get_count))),
         )
         .await;
 
-        let req = test::TestRequest::get().uri("/counter").to_request();
+        let req = test::TestRequest::get().uri("/count").to_request();
         let resp = app.call(req).await.unwrap();
         let body_bytes = to_bytes(resp.into_body()).await.unwrap();
         assert_eq!(body_bytes, r##"{"success":true,"count":1}"##);

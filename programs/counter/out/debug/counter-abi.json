@@ -4,7 +4,7 @@
     "inputs": [
       {
         "name": "value",
-        "type": "u64",
+        "type": "u32",
         "components": null
       }
     ],
@@ -12,7 +12,7 @@
     "outputs": [
       {
         "name": "",
-        "type": "u64",
+        "type": "u32",
         "components": null
       }
     ]
@@ -24,7 +24,7 @@
     "outputs": [
       {
         "name": "",
-        "type": "u64",
+        "type": "u32",
         "components": null
       }
     ]
@@ -34,7 +34,7 @@
     "inputs": [
       {
         "name": "amount",
-        "type": "u64",
+        "type": "u32",
         "components": null
       }
     ],
@@ -42,7 +42,7 @@
     "outputs": [
       {
         "name": "",
-        "type": "u64",
+        "type": "u32",
         "components": null
       }
     ]

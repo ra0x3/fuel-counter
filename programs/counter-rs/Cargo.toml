@@ -17,12 +17,13 @@ env_logger = "0.9"
 futures-util = { version = "0.3.7", default-features = false, features = ["std"] }
 json = "0.12"
 fuel-tx = "0.9"
-fuels-abigen-macro = "0.12"
-fuels = "0.12"
+fuels-abigen-macro = "0.13"
+fuels = "0.13"
 fuel-gql-client = "0.6"
 fuel-core = "0.6"
 dotenv = "0.14"
 rand = "0.8"
+bytes = "0.4"
 
 [[bin]]
 name = "server"
@@ -31,3 +32,15 @@ path = "src/bin/server.rs"
 [lib]
 name = "counter"
 path = "src/lib.rs"
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = [
+  "-C", "link-arg=-undefined",
+  "-C", "link-arg=dynamic_lookup",
+]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = [
+  "-C", "link-arg=-undefined",
+  "-C", "link-arg=dynamic_lookup",
+]

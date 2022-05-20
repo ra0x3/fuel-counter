@@ -1,16 +1,20 @@
 #[macro_use]
 extern crate log;
 
+use fuel_core::{
+    chain_config::{ChainConfig, CoinConfig, StateConfig},
+    service::{Config, DbType, FuelService},
+};
 use fuel_gql_client::client::FuelClient;
-use fuel_core::{service::{Config, FuelService}};
 use fuels::{
-    prelude::{Contract, LocalWallet, Provider, TxParameters},
-    signers::{fuel_crypto::SecretKey, wallet::Wallet},
+    prelude::{Contract, LocalWallet, Provider, TxParameters, DEFAULT_COIN_AMOUNT},
+    signers::wallet::Wallet,
+    test_helpers::setup_address_and_coins,
 };
 use fuels_abigen_macro::abigen;
-use rand::{rngs::StdRng, RngCore, SeedableRng};
+use std::net::{Ipv4Addr, SocketAddr};
 
-pub async fn get_contract_id(provider: &Provider, wallet: &Wallet) -> String {
+pub async fn get_contract_id(wallet: &Wallet) -> String {
     dotenv::dotenv().ok();
     match dotenv::var("CONTRACT_ID") {
         Ok(id) => {
@@ -19,10 +23,11 @@ pub async fn get_contract_id(provider: &Provider, wallet: &Wallet) -> String {
         }
         _ => {
             debug!("Creating new deployment for non-existent contract");
-            let compiled =
+            let _compiled =
                 Contract::load_sway_contract("./../counter/out/debug/counter.bin").unwrap();
 
-            let contract_id = Contract::deploy(&compiled, provider, wallet, tx_params())
+            let bin_path = "./../counter/out/debug/counter.bin".to_string();
+            let contract_id = Contract::deploy(&bin_path, wallet, tx_params())
                 .await
                 .unwrap();
 
@@ -32,14 +37,38 @@ pub async fn get_contract_id(provider: &Provider, wallet: &Wallet) -> String {
 }
 
 pub async fn setup_provider_and_wallet() -> (Provider, LocalWallet) {
-    let srv = FuelService::new_node(Config::local_node()).await.unwrap();
+    let (secret, coins) = setup_address_and_coins(1, DEFAULT_COIN_AMOUNT);
+
+    let coin_configs = coins
+        .into_iter()
+        .map(|(utxo_id, coin)| CoinConfig {
+            tx_id: Some(*utxo_id.tx_id()),
+            output_index: Some(utxo_id.output_index() as u64),
+            block_created: Some(coin.block_created),
+            maturity: Some(coin.maturity),
+            owner: coin.owner,
+            amount: coin.amount,
+            asset_id: coin.asset_id,
+        })
+        .collect();
+
+    let config = Config {
+        chain_conf: ChainConfig {
+            initial_state: Some(StateConfig {
+                coins: Some(coin_configs),
+                ..StateConfig::default()
+            }),
+            ..ChainConfig::local_testnet()
+        },
+        database_type: DbType::InMemory,
+        utxo_validation: false,
+        addr: SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 4000),
+        ..Config::local_node()
+    };
+
+    let srv = FuelService::new_node(config).await.unwrap();
     let client = FuelClient::from(srv.bound_address);
     info!("Fuel client started at {:?}", client);
-
-    let mut rng = StdRng::seed_from_u64(2322u64);
-    let mut secret_seed = [0u8; 32];
-    rng.fill_bytes(&mut secret_seed);
-    let secret = unsafe { SecretKey::from_bytes_unchecked(secret_seed) };
 
     let provider = Provider::new(client);
     let wallet = LocalWallet::new_from_private_key(secret, provider.clone());
