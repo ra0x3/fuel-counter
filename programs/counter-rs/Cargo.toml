@@ -24,23 +24,3 @@ fuel-core = "0.6"
 dotenv = "0.14"
 rand = "0.8"
 bytes = "0.4"
-
-[[bin]]
-name = "server"
-path = "src/bin/server.rs"
-
-[lib]
-name = "counter"
-path = "src/lib.rs"
-
-[target.x86_64-unknown-linux-gnu]
-rustflags = [
-  "-C", "link-arg=-undefined",
-  "-C", "link-arg=dynamic_lookup",
-]
-
-[target.aarch64-unknown-linux-gnu]
-rustflags = [
-  "-C", "link-arg=-undefined",
-  "-C", "link-arg=dynamic_lookup",
-]
