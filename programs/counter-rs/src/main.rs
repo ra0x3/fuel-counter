@@ -105,18 +105,18 @@ struct InitCountResponse {
 }
 
 async fn initialize_count(req: HttpRequest) -> Result<HttpResponse, Error> {
-    let resp = InitCountResponse {
-        success: true,
-        count: 1u64,
-    };
     let state = req.app_data::<web::Data<Mutex<Counter>>>().unwrap();
     let contract = match state.lock() {
         Ok(c) => c,
         Err(e) => {
             error!("Could not get state: {}", e);
-            return Ok(HttpResponse::Ok()
-                .content_type("application/json")
-                .body(serde_json::to_string(&resp).unwrap()));
+            return Ok(HttpResponse::Ok().content_type("application/json").body(
+                serde_json::to_string(&InitCountResponse {
+                    success: false,
+                    count: 1,
+                })
+                .unwrap(),
+            ));
         }
     };
 
@@ -129,7 +129,7 @@ async fn initialize_count(req: HttpRequest) -> Result<HttpResponse, Error> {
 
     debug!("{:?}", result);
 
-    let count: u64 = result.receipts[1].val().unwrap();
+    let count: u64 = result.receipts[2].val().unwrap();
     Ok(HttpResponse::Ok().content_type("application/json").body(
         serde_json::to_string(&InitCountResponse {
             success: true,

@@ -1,30 +1,26 @@
 # counter
 
-### Usage
-Start fuel node
+## Usage
+
+### OSX
+
+Start Fuel node, deploy contract, and start API webserver
+
 ```bash
-fuel-core --db-type in-memory
+RUST_LOG=debug RUSTFLAGS="-Clink-arg=-Wl" cargo run --target x86_64-apple-darwin
 ```
 
-Deploy contract
+### Ubuntu
+
 ```bash
-cd programs/counter
-forc deploy --locked
+RUST_LOG=debug RUSTFLAGS="-Clink-arg=-Wl,--allow-multiple-definition" cargo run
+--target x86_64-unknown-linux-gnu
 ```
 
-Set deployed contract ID
-```bash
-cd programs/counter-rs
-echo "CONTRACT_ID='0x123....'" > programs/counter-rs/.env
-```
+### Interaction
 
-Run the backend
-```bash
-cd programs/counter-rs
-RUST_LOG=debug cargo run --bin server
-```
+Make a request to the contract via the API server
 
-Make a sample request to the backend
 ```bash
-curl -X GET http://localhost:8080/counter
+curl -X POST http://127.0.0.1:8080/count
 ```
